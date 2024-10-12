@@ -6,3 +6,6 @@ A daemonized version of yash withc client and server programs that mimic the ssh
 The following diagram outlines how the server handles client connections in unique threads and logs return values. 
 ![yashd-server 2](https://github.com/user-attachments/assets/fb24d3bb-007a-4ae8-9a3c-67e5d0de9cc9)
 
+## yash Client
+
+This is a place holder for the client section
