@@ -54,18 +54,22 @@ void handle_sigtstp(int sig) {
     send(sockfd, ctl_msg, strlen(ctl_msg), 0);
 }
 
+void clean_buffer(char *buffer){
+    memset(buffer, 0 , BUFSIZE);
+}
+
 void handle_client(int sockfd) {
     char input[BUFSIZE];
-
+    int rc;
+    printf("# ");  // Display prompt
     // Infinite loop to handle client commands
     while (1) {
-        printf("# ");  // Display prompt
-
+        // Free memory 
+        memset(input, 0, BUFSIZE);
         // Read user input
         if (fgets(input, sizeof(input), stdin) == NULL) {
             break;  // Exit if EOF (Ctrl-D)
         }
-
         // Remove trailing newline
         input[strcspn(input, "\n")] = 0;
 
@@ -79,12 +83,19 @@ void handle_client(int sockfd) {
         send(sockfd, buffer, strlen(buffer), 0);
 
         // Receive the response from the server
-        memset(buffer, 0, BUFSIZE);
-        int len = recv(sockfd, buffer, BUFSIZE, 0);
-        if (len > 0) {
+        memset(buffer, 0, BUFSIZE); // Zero-out buffer
+      
+        rc = recv(sockfd, buffer, BUFSIZE, 0);
+        if (rc > 0) {
             // Display the server's response
             printf("%s", buffer);
-        } else if (len == 0) {
+            // Get new prompt sent by server
+            clean_buffer(buffer);
+            rc = recv(sockfd, buffer, BUFSIZE, 0);
+            if (rc >= 3)
+                printf("%s", buffer);
+                continue;
+        } else if (rc == 0) {
             printf("Server disconnected.\n");
             break;
         }

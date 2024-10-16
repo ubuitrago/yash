@@ -1,0 +1,23 @@
+ls 
+ls -a -l
+date
+whoami
+CTRL + D
+ls > foo.txt
+cat < fake-file.bar
+cat < my-file > your_file
+ls | wc
+ls -a -l -t -r . | wc -c -L
+left_child < in.txt > err1.txt | right_child > out.txt 2> err2.txt
+Ctrl-C terminates command
+Ctrl-C terminates piped command
+Ctrl-Z stops command
+Ctrl-Z stops piped command
+jobs
+Run a command; then Ctrl-Z; then bg; then fg
+sleep 8 & 
+fg
+sleep 8
+CTRL Z
+bg
+jobs
