@@ -1,22 +1,36 @@
-CC   = gcc
-CFLAGS = -I.
+# Compiler and flags
+CC = gcc
+CFLAGS = -I. -g
 LIBS = -lpthread
-DEPS = serveTCPsocks.h yash.h
-SRCS = yashd.c serveTCPsocks.c
-OBJS = $(SRCS:.c=.o)
-TARGET = yashd
 
-# Build the target executable
-$(TARGET): $(OBJS) $(DEPS)
+# Source files
+SERVER_SRCS = Server/yashd.c
+CLIENT_SRCS = Client/yash.c
+
+# Object files
+SERVER_OBJS = $(SERVER_SRCS:.c=.o)
+CLIENT_OBJS = $(CLIENT_SRCS:.c=.o)
+
+# Target Executables
+SERVER = yashd
+CLIENT = yash
+
+# Default target: Build both server and client executables
+all: $(SERVER) $(CLIENT)
+
+# Build the server executable
+$(SERVER): $(SERVER_OBJS)
 	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
 
+# Build the client executable
+$(CLIENT): $(CLIENT_OBJS)
+	$(CC) -o $@ $^ $(CFLAGS)
+
 # Compile source files into object files
-%.o: %.c $(DEPS)
+%.o: %.c
 	$(CC) -g -c -o $@ $< $(CFLAGS)
 
-client: dev-client.c
-	gcc -g -o client dev-client.c
 # Clean up generated files
 .PHONY: clean
 clean:
-	rm -f $(OBJS) $(TARGET) client tcpClient.o dev-client.o
+	rm -f $(SERVER_OBJS) $(CLIENT_OBJS) $(SERVER) $(CLIENT)
