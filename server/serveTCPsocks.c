@@ -27,7 +27,9 @@ DESCRIPTION:
 #include <stdlib.h> /* exit() */
 #include <pthread.h>
 #include "serveTCPsocks.h"
+#include "yash.c"
 
+#define BUFSIZE 512
 int serve_inet_socket() {
     int   sd, psd;
     struct   sockaddr_in server;
@@ -104,7 +106,8 @@ int serve_inet_socket() {
 //TODO:Method that creates a message queue for each serve_yash thread
 
 void *serve_yash(void * input) {
-    char buf[512];
+    char buf[BUFSIZE];
+    char command[BUFSIZE];
     int rc;
     int psd;
     struct sockaddr_in from;
@@ -114,6 +117,10 @@ void *serve_yash(void * input) {
     from = info->from; 
 	
     struct  hostent *hp, *gethostbyname();
+
+    // Save original stdin and stdout
+    int saved_stdin = dup(STDIN_FILENO);
+    int saved_stdout = dup(STDOUT_FILENO);
     
     printf("Serving %s:%d\n", inet_ntoa(from.sin_addr), ntohs(from.sin_port));
 
@@ -123,30 +130,58 @@ void *serve_yash(void * input) {
     else
 	printf("(Name is : %s)\n", hp->h_name);
     
-    /**  get data from  client and send it back */
+    // Get data from  client
+    int exec_return; // Return value from exec image within serving thread
     for(;;){
-	printf("\n...server is waiting...\n");
-	if( (rc=recv(psd, buf, sizeof(buf), 0)) < 0){
-	    perror("receiving stream  message");
-	    exit(-1);
-	}
-	if (rc > 0){
-	    buf[rc]='\0';
-	    printf("Received: %s\n", buf);
-	    printf("From TCP/Client: %s:%d\n", inet_ntoa(from.sin_addr),
-		   ntohs(from.sin_port));
-	    printf("(Name is : %s)\n", hp->h_name);
-	    if (send(psd, buf, rc, 0) <0 )
-		perror("sending stream message");
-	}
-	else {
-	    printf("TCP/Client: %s:%d\n", inet_ntoa(from.sin_addr),
-		   ntohs(from.sin_port));
-	    printf("(Name is : %s)\n", hp->h_name);
-	    printf("Disconnected..\n");
-	    close (psd);
-	    pthread_exit(0);
-	}
+    	//printf("\n...server is waiting...\n");
+    	if((rc=recv(psd, buf, sizeof(buf), 0)) < 0){
+    	    perror("receiving stream  message");
+    	    exit(-1);
+    	}
+
+        // Parse received buffer
+    	if (rc > 0){
+    	    buf[rc]='\0';
+    	    printf("Received: %s\n", buf);
+    	    //printf("From TCP/Client: %s:%d\n", inet_ntoa(from.sin_addr),
+    		   //ntohs(from.sin_port));
+    	    //printf("(Name is : %s)\n", hp->h_name);
+            // Handle CMD messages
+            if (strncmp(buf, "CMD ", 4) == 0) {
+                strncpy(command, buf + 4, sizeof(command)-1);  // Extract the command after "CMD "
+                command[sizeof(command) - 1] = '\0';  // Remove newline character
+
+                printf("Executing command: %s\n", command);
+
+                // Temporarily redirect stdout to the client socket
+                dup2(psd, STDOUT_FILENO);
+                dup2(psd, STDERR_FILENO);
+                // send command to yash (project 1) entrypoint
+                exec_return = yash_entrypoint(command);
+                // Restore original stdin/stdout
+                dup2(saved_stdin, STDIN_FILENO);   
+                dup2(saved_stdout, STDOUT_FILENO);
+                if (exec_return == 0) {   
+                    // After command execution, send the prompt to the client      
+                    if (send(psd, "\n# ", 3, 0) <0 )
+                      perror("sending stream message");
+                } else {
+                    printf("Return value: %d\n", exec_return);
+                }
+            }
+
+            // After command execution, send the prompt to the client      
+    	    // if (send(psd, "\n# ", 3, 0) <0 )
+    		//   perror("sending stream message");
+    	}
+    	else {
+    	    printf("TCP/Client: %s:%d\n", inet_ntoa(from.sin_addr),
+    		   ntohs(from.sin_port));
+    	    printf("(Name is : %s)\n", hp->h_name);
+    	    printf("Disconnected..\n");
+    	    close (psd);
+    	    pthread_exit(0);
+        }
     }
 }
 
