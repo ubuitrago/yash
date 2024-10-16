@@ -70,7 +70,6 @@ void handle_client(int sockfd) {
         if (fgets(input, sizeof(input), stdin) == NULL) {
             break;  // Exit if EOF (Ctrl-D)
         }
-
         // Remove trailing newline
         input[strcspn(input, "\n")] = 0;
 
@@ -84,7 +83,8 @@ void handle_client(int sockfd) {
         send(sockfd, buffer, strlen(buffer), 0);
 
         // Receive the response from the server
-        memset(buffer, 0, BUFSIZE);
+        memset(buffer, 0, BUFSIZE); // Zero-out buffer
+      
         rc = recv(sockfd, buffer, BUFSIZE, 0);
         if (rc > 0) {
             // Display the server's response
