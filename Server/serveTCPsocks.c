@@ -147,7 +147,7 @@ void *serve_yash(void * input) {
     		   //ntohs(from.sin_port));
     	    //printf("(Name is : %s)\n", hp->h_name);
             // Handle CMD messages
-            if (strncmp(buf, "CMD ", 4) == 0) || (strncmp(buf, "CTL ", 4) == 0) {
+            if (strncmp(buf, "CMD ", 4) == 0 || strncmp(buf, "CTL ", 4) == 0) {
                 strncpy(command, buf + 4, sizeof(command)-1);  // Extract the command after "CMD "
                 command[sizeof(command) - 1] = '\0';  // Remove newline character
 
