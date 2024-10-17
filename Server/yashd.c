@@ -20,10 +20,6 @@
 extern int errno;
 
 #define PATHMAX 255
-static char u_server_path[PATHMAX+1] = "/tmp/";  /* default */
-static char u_socket_path[PATHMAX+1];
-static char u_log_path[PATHMAX+1];
-static char u_pid_path[PATHMAX+1];
 
 void sig_pipe(int n) {
    perror("Broken pipe signal");
@@ -46,7 +42,10 @@ void sig_chld(int n){
  * @param[in] path is where the daemon eventually operates
  * @param[in] mask is the umask typically set to 0
  */
-void daemon_init(const char * const path, uint mask){
+void daemon_init(){
+  const char *pid_file_path = "/tmp/yashd.pid";
+  const char *yashd_log_path = "/tmp/yashd.log";
+  int mask = 0;
   pid_t pid;
   char buff[256];
   static FILE *log; /* for the log */
@@ -61,7 +60,7 @@ void daemon_init(const char * const path, uint mask){
     exit(0);
 
   /* the child */
-  serve_inet_socket();
+  //serve_inet_socket();
   /* Close all file descriptors that are open */
   for (k = getdtablesize()-1; k>0; k--)
       close(k);
@@ -72,16 +71,16 @@ void daemon_init(const char * const path, uint mask){
     exit(0);
   }
   dup2(fd, STDIN_FILENO);      /* detach stdin */
-  dup2(fd, STDOUT_FILENO);     /* detach stdout */
+  dup2(fd, STDERR_FILENO);     /* detach stdout */
   close (fd);
   /* From this point on printf and scanf have no effect */
 
   /* Redirecting stderr to u_log_path */
-  log = fopen(u_log_path, "aw"); /* attach stderr to u_log_path */
+  log = fopen(yashd_log_path, "aw"); /* attach stdout to log */
   fd = fileno(log);  /* obtain file descriptor of the log */
-  dup2(fd, STDERR_FILENO);
+  dup2(fd, STDOUT_FILENO);
   close (fd);
-  /* From this point on printing to stderr will go to /tmp/u-echod.log */
+  /* From this point on printing to stdout will go to /tmp/yashd.log */
 
   /* Establish handlers for signals */
   if ( signal(SIGCHLD, sig_chld) < 0 ) {
@@ -93,13 +92,16 @@ void daemon_init(const char * const path, uint mask){
     exit(1);
   }
 
-  /* Change directory to specified directory */
-  chdir(path); 
+  // Change directory to /tmp
+  chdir("/tmp"); 
 
   /* Set umask to mask (usually 0) */
   umask(mask); 
-  
-  /* Detach controlling terminal by becoming sesion leader */
+
+  // Serve incoming connections on a network socket
+  serve_inet_socket();
+
+  // Detach controlling terminal by becoming session leader
   setsid();
 
   /* Put self in a new process group */
@@ -107,7 +109,7 @@ void daemon_init(const char * const path, uint mask){
   setpgrp(); /* GPI: modified for linux */
 
   /* Make sure only one server is running */
-  if ( ( k = open(u_pid_path, O_RDWR | O_CREAT, 0666) ) < 0 )
+  if ( ( k = open(pid_file_path, O_RDWR | O_CREAT, 0666) ) < 0 )
     exit(1);
   if ( lockf(k, F_TLOCK, 0) != 0)
     exit(0);
@@ -118,8 +120,8 @@ void daemon_init(const char * const path, uint mask){
 
   return;
 }
-
-int main(int argc, char  **argv){
-  daemon_init(u_server_path, 0);
+// Backup: int main(int argc, char  **argv)
+int main(){
+  daemon_init();
   return 0;
 }
