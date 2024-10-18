@@ -30,7 +30,7 @@ void sig_pipe(int n) {
  */
 void sig_chld(int n){
   int status;
-  fprintf(stderr, "Child terminated\n");
+  fprintf(stderr, "DEBUG: Child terminated\n");
   wait(&status); /* So no zombies */
 }
 

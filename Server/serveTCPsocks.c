@@ -165,6 +165,11 @@ void *serve_yash(void * input) {
                     // After command execution, send the prompt to the client      
                     if (send(psd, "\n# ", 3, 0) <0 )
                       perror("sending stream message");
+                } else if (exec_return == 1) {
+                    // getting an empty string or enter
+                      if (send(psd, "\n# ", 3, 0) <0 )
+                      perror("sending stream message");
+                    continue;
                 } else {
                     printf("Return value: %d\n", exec_return);
                 }

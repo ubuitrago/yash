@@ -267,8 +267,9 @@ int yash_entrypoint(char *inString) {
     if (!inString || strcmp(inString, "\n") == 0 || strcmp(inString, "") == 0){
         // Print any DONE jobs
         print_jobs();
-        free(inString);
-        exit(0);
+        //free(inString);
+        //exit(0);
+        return 1;
     }
     /*---------------------------------------------------------------------------------------*/
     // Copy original string for updating job table
