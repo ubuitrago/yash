@@ -133,7 +133,7 @@ void *serve_yash(void * input) {
     // Get data from  client
     int exec_return; // Return value from exec image within serving thread
     for(;;){
-    	//printf("\n...server is waiting...\n");
+    	printf("\n...server is waiting...\n");
     	if((rc=recv(psd, buf, sizeof(buf), 0)) < 0){
     	    perror("receiving stream  message");
     	    exit(-1);
@@ -142,22 +142,23 @@ void *serve_yash(void * input) {
         // Parse received buffer
     	if (rc > 0){
     	    buf[rc]='\0';
-    	    printf("Received: %s\n", buf);
-    	    //printf("From TCP/Client: %s:%d\n", inet_ntoa(from.sin_addr),
-    		   //ntohs(from.sin_port));
-    	    //printf("(Name is : %s)\n", hp->h_name);
+    	    printf("DEBUG:Received: %s\n", buf);
+    	    printf("From TCP/Client: %s:%d\n", inet_ntoa(from.sin_addr),
+    		   ntohs(from.sin_port));
+    	    printf("(Name is : %s)\n", hp->h_name);
             // Handle CMD messages
             if (strncmp(buf, "CMD ", 4) == 0 || strncmp(buf, "CTL ", 4) == 0) {
                 strncpy(command, buf + 4, sizeof(command)-1);  // Extract the command after "CMD "
                 command[sizeof(command) - 1] = '\0';  // Remove newline character
 
-                printf("Executing command: %s\n", command);
+                printf("DEBUG: Executing command: %s\n", command);
 
                 // Temporarily redirect stdout to the client socket
                 dup2(psd, STDOUT_FILENO);
                 dup2(psd, STDERR_FILENO);
                 // send command to yash (project 1) entrypoint
                 exec_return = yash_entrypoint(command);
+                printf("DEBUG: Return value: %d\n", exec_return);
                 // Restore original stdin/stdout
                 dup2(saved_stdin, STDIN_FILENO);   
                 dup2(saved_stdout, STDOUT_FILENO);
@@ -171,7 +172,7 @@ void *serve_yash(void * input) {
                       perror("sending stream message");
                     continue;
                 } else {
-                    printf("Return value: %d\n", exec_return);
+                    printf("DEBUG: Return value: %d\n", exec_return);
                 }
             }
     	}

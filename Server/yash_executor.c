@@ -345,6 +345,8 @@ int yash_entrypoint(char *inString) {
             if (waitpid(cpid, &status, WUNTRACED | WCONTINUED) < 0) {
                 perror("Failed to wait for process");
                 return -1;
+            }else{
+                return 0;
             }
 
             // Return terminal control to yash

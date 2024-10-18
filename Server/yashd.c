@@ -60,7 +60,7 @@ void daemon_init(){
     exit(0);
 
   /* the child */
-  //serve_inet_socket();
+  serve_inet_socket();
   /* Close all file descriptors that are open */
   for (k = getdtablesize()-1; k>0; k--)
       close(k);
@@ -71,14 +71,14 @@ void daemon_init(){
     exit(0);
   }
   dup2(fd, STDIN_FILENO);      /* detach stdin */
-  dup2(fd, STDERR_FILENO);     /* detach stdout */
+  //dup2(fd, STDOUT_FILENO);     /* detach stdout */
   close (fd);
   /* From this point on printf and scanf have no effect */
 
   /* Redirecting stderr to u_log_path */
   log = fopen(yashd_log_path, "aw"); /* attach stdout to log */
   fd = fileno(log);  /* obtain file descriptor of the log */
-  dup2(fd, STDOUT_FILENO);
+  dup2(fd, STDERR_FILENO);
   close (fd);
   /* From this point on printing to stdout will go to /tmp/yashd.log */
 
@@ -99,7 +99,7 @@ void daemon_init(){
   umask(mask); 
 
   // Serve incoming connections on a network socket
-  serve_inet_socket();
+  //serve_inet_socket();
 
   // Detach controlling terminal by becoming session leader
   setsid();
