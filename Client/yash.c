@@ -58,6 +58,16 @@ void clean_buffer(char *buffer){
     memset(buffer, 0 , BUFSIZE);
 }
 
+
+int is_empty_input(const char *input) {
+    // Check if the input string contains only spaces, tabs, or newlines
+    for (int i = 0; input[i] != '\0'; i++) {
+        if (input[i] != ' ' && input[i] != '\t' && input[i] != '\n') {
+            return 0;  // Not empty, return false
+        }
+    }
+    return 1;  // Input is empty or whitespace only
+}
 void handle_client(int sockfd) {
     char input[BUFSIZE];
     int rc;
@@ -73,6 +83,12 @@ void handle_client(int sockfd) {
         // Remove trailing newline
         input[strcspn(input, "\n")] = 0;
 
+        // Check if the input is empty (Enter key, or only spaces/tabs)
+        if (is_empty_input(input)) {
+            printf("# ");  // If input is empty or whitespace, print the prompt again
+            continue;      // Skip sending to the server
+        }
+        
         // Handle "quit" to exit the client
         if (strcmp(input, "quit") == 0) {
             break;
