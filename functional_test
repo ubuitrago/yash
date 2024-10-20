@@ -1,5 +1,6 @@
 ls 
 ls -a -l
+wrong_command
 date
 whoami
 CTRL + D
