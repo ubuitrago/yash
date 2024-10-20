@@ -156,12 +156,27 @@ void *serve_yash(void * input) {
     	if (rc > 0){
     	    buf[rc]='\0';
     	    printf("Received: %s\n", buf);
-    	    //printf("From TCP/Client: %s:%d\n", inet_ntoa(from.sin_addr),
-    		   //ntohs(from.sin_port));
-    	    //printf("(Name is : %s)\n", hp->h_name);
-
+    	    
+            // Handle CTL messages
+            if (strncmp(buf, "CTL ", 4) == 0) {
+                strncpy(command, buf + 4, sizeof(command)-1);  // Extract the command after "CTL "
+                command[sizeof(command) - 1] = '\0';  // Remove newline character
+                // Ignore incoming signal if global cpid hasn't been altered, i.e. no running process
+                if (cpid == -1){
+                    if (send(psd, "\n# ", 4, 0) < 0 )
+                        perror("sending stream message");
+                }
+                // Send signals to running processes
+                else{
+                    if (strcmp(command, "c") == 0) {
+                        kill(cpid, SIGINT);
+                    } else if (strcmp(command, "z") == 0){
+                        kill(cpid, SIGTSTP);
+                    }
+                }
+            }
             // Handle CMD messages
-            if (strncmp(buf, "CMD ", 4) == 0) {
+            else if (strncmp(buf, "CMD ", 4) == 0) {
                 strncpy(command, buf + 4, sizeof(command)-1);  // Extract the command after "CMD "
                 command[sizeof(command) - 1] = '\0';  // Remove newline character
 
@@ -169,6 +184,7 @@ void *serve_yash(void * input) {
 
                 // Redirect stdout to the write end of the pipe
                 dup2(pipefd[1], STDOUT_FILENO);
+                dup2(psd, STDIN_FILENO); // Recieve STDIN from client
                 // if exec_return == KEY 
                 //     dup2(pipefd[0], psd)
                 //     // wait CTL D signal 
@@ -176,9 +192,6 @@ void *serve_yash(void * input) {
                 //     send byffer yash_entyrpoint
                 // Close the write end of the pipe as it's now duplicated
                 close(pipefd[1]);
-
-                // dup2(psd, STDOUT_FILENO);
-                // dup2(psd, STDERR_FILENO);
 
                 // send command to yash (project 1) entrypoint
                 exec_return = yash_entrypoint(command); // Return code 0 is a success
@@ -197,31 +210,23 @@ void *serve_yash(void * input) {
                 dup2(saved_stdout, STDOUT_FILENO);
                 // Parse output and send a response
                 printf("Return value: %d\n", exec_return);
+                printf("Return COUNT: %d\n", exec_return_count);
+
                 if (exec_return == 0) {
                     //printf("%s", exec_return_buffer);
                     // If output exists, send to client
                     if (exec_return_count > 0){
                         if (send(psd, exec_return_buffer, exec_return_count, 0) < 0 )
                             perror("sending stream message");
-
-                    }// Else send a keyword for client side to handle
-                    else{
-                        if (send(psd, "NONE\0", 5, 0) < 0)
-                            perror("sending stream message");
                     }
-
-                    // After command execution, send the prompt to the client      
-                    if (send(psd, "\n# ", 4, 0) < 0 )
-                        perror("sending stream message");
                 } 
                 else {
                     printf("Return value: %d\n", exec_return);
                 }
+                // After command execution, send the prompt to the client      
+                if (send(psd, "\n# ", 4, 0) < 0 )
+                    perror("sending stream message");
             }
-
-            // After command execution, send the prompt to the client      
-    	    // if (send(psd, "\n# ", 3, 0) <0 )
-    		//   perror("sending stream message");
     	}
     	else {
     	    printf("TCP/Client: %s:%d\n", inet_ntoa(from.sin_addr),

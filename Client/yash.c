@@ -33,6 +33,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <signal.h>
+#include <errno.h>
 
 #define PORT 3820
 #define BUFSIZE 1024
@@ -69,28 +70,26 @@ int is_empty_input(const char *input) {
     return 1;  // Input is empty or whitespace only
 }
 
-int contains_gt(const char *input) {
-    // Check if the input string contains the character '>'
-    for (int i = 0; input[i] != '\0'; i++) {
-        if (input[i] == '>') {
-            return 1;  // Found '>', return true
-        }
-    }
-    return 0;  // '>' not found, return false
-}
-
 void handle_client(int sockfd) {
-    char input[BUFSIZE];
     int rc;
+    char input[BUFSIZE];
     printf("# ");  // Display prompt
     // Infinite loop to handle client commands
     while (1) {
         // Free memory 
         memset(input, 0, BUFSIZE);
-        // Read user input
-        if (fgets(input, sizeof(input), stdin) == NULL) {
-            break;  // Exit if EOF (Ctrl-D)
+        // Assign fgets return value to variable ri and check
+        char *ri = fgets(input, sizeof(input), stdin);
+        if (ri == NULL) {
+            if (errno == EINTR) {
+                continue;
+            } else{
+                break;  // Exit if EOF (Ctrl-D)
+            }
         }
+        // if (fgets(input, sizeof(input), stdin) == NULL) {
+        //     break;  // Exit if EOF (Ctrl-D)
+        // }
         // Remove trailing newline
         input[strcspn(input, "\n")] = 0;
 
@@ -99,9 +98,6 @@ void handle_client(int sockfd) {
             printf("# ");  // If input is empty or whitespace, print the prompt again
             continue;      // Skip sending to the server
         }
-        
-        // Check if output is redirected
-        //int output_redirect = contains_gt(input);
 
         // Handle "quit" to exit the client
         if (strcmp(input, "quit") == 0) {
@@ -119,27 +115,13 @@ void handle_client(int sockfd) {
         if (rc > 0) {
             // Ensure the prompt is null-terminated
             buffer[rc] = '\0';
-            // Search for the last occurrence of '#' in the buffer
-            //pound_prompt = strrchr(buffer, '#');
-        
         
             // Display the server's response
             printf("%s", buffer);
 
             // clen buffer and prepare for next command
             clean_buffer(buffer);
-            // rc = recv(sockfd, buffer, BUFSIZE, 0);
-            // // Ensure the prompt is null-terminated
-            // buffer[rc] = '\0';
-            // printf("%s", buffer);
             continue;
-            // Continue if output is not expected
-            // if (output_redirect)
-            //     continue;
-            // else    // Else retrieve the prompt sent by server
-            //     rc = recv(sockfd, buffer, BUFSIZE, 0);
-            //     printf("%s", buffer);
-            //     continue;
         } else if (rc == 0) {
             printf("Server disconnected.\n");
             break;

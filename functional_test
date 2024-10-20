@@ -13,7 +13,7 @@ Ctrl-C terminates command
 Ctrl-C terminates piped command
 Ctrl-Z stops command
 Ctrl-Z stops piped command
-jobs
+jobs "empty jobs causes hang-up, unless I add something to buffer"
 Run a command; then Ctrl-Z; then bg; then fg
 sleep 8 & 
 fg

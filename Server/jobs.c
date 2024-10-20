@@ -64,6 +64,10 @@ void update_job_status() {
 
 void print_jobs() {
     update_job_status(); // Update the status of jobs before printing
+    if (job_count == 0){
+        printf("garbage");
+        fflush(stdout);
+    }
     for (int i = 0; i < job_count; i++) {
         if (jobs[i].status == DONE) {
             // Print completed jobs

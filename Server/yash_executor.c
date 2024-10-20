@@ -299,7 +299,7 @@ int yash_entrypoint(char *inString) {
     /*---------------------------------------------------------------------------------------*/
     //Handle expected job control commands: jobs, fg, bg
 
-    // Run job commands and continue loop
+    // Run job commands
     if (trigger_job_cmd){
         free(dup_inString);
         print_jobs();
@@ -346,6 +346,8 @@ int yash_entrypoint(char *inString) {
                 return -1;
             }
             printf("Status %d\n", status);
+            if (status != 0)
+                return -1;
             // Return terminal control to yash
             // if (tcsetpgrp(STDIN_FILENO, parent) < 0) {
             //     perror("Failed to return control to shell");
@@ -393,13 +395,17 @@ int yash_entrypoint(char *inString) {
         }
 
         // Execute new image   
-        if (execvp(parsedcmd[0], parsedcmd) < 0);
-            printf("parsedcmd %s", parsedcmd);
-            return -1;
+        if (execvp(parsedcmd[0], parsedcmd) < 0){
+            //printf("parsedcmd %s", parsedcmd);
+            exit(EXIT_FAILURE);
+        }
+        printf("Child ran %s", parsedcmd);
         // Free allocated memory
         //free(parsedcmd);
         //kill(0, SIGCHLD);
-        return 0;
+        //return 0;
+        cpid = -1;
+        exit(0);
     } else 
         perror("fork failed"); // Error if fork fails
 
