@@ -4,7 +4,7 @@ CFLAGS = -I. -g
 LIBS = -lpthread
 
 # Source files
-SERVER_SRCS = Server/yashd.c
+SERVER_SRCS = Server/yashd.c Server/yashd_logger.c 
 CLIENT_SRCS = Client/yash.c
 
 # Object files

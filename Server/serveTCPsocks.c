@@ -16,6 +16,7 @@ DESCRIPTION:
 
 */
 #include <stdio.h>
+#include "yashd_logger.h"  // Include the logger header
 /* socket(), bind(), recv, send */
 #include <sys/types.h>
 #include <sys/socket.h> /* sockaddr_in */
@@ -181,6 +182,10 @@ void *serve_yash(void * input) {
                 command[sizeof(command) - 1] = '\0';  // Remove newline character
 
                 printf("Executing command: %s\n", command);
+
+                // Log the command
+                log_command(&from, command);  // Logging the command
+
 
                 // Redirect stdout to the write end of the pipe
                 dup2(pipefd[1], STDOUT_FILENO);
