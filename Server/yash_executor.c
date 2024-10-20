@@ -294,7 +294,7 @@ int yash_entrypoint(char *inString) {
     // Set process groups 
     if (setpgid(0,0) < 0){
         perror("setpgid");
-        exit(1);
+        return -1;
     }
     /*---------------------------------------------------------------------------------------*/
     //Handle expected job control commands: jobs, fg, bg
@@ -303,15 +303,15 @@ int yash_entrypoint(char *inString) {
     if (trigger_job_cmd){
         free(dup_inString);
         print_jobs();
-        exit(0);
+        return 0;
     }else if (trigger_fg_cmd){  // Run fg command
         free(dup_inString);
         fg_job();
-        exit(0);
+        return 0;
     }else if (trigger_bg_cmd){  // Run bg command
         free(dup_inString);
         bg_job();
-        exit(0);
+        return 0;
     }
     /*---------------------------------------------------------------------------------------*/
     // Set global tracker for pipline procs
@@ -345,7 +345,7 @@ int yash_entrypoint(char *inString) {
                 perror("Failed to wait for process");
                 return -1;
             }
-
+            printf("Status %d\n", status);
             // Return terminal control to yash
             // if (tcsetpgrp(STDIN_FILENO, parent) < 0) {
             //     perror("Failed to return control to shell");
@@ -354,6 +354,7 @@ int yash_entrypoint(char *inString) {
         else{
             add_job((int) cpid, dup_inString, false); // Job starts as running
             waitpid(cpid, &status, WNOHANG);
+            printf("& Status %d\n", status);
         }
 
         // Free dynamically allocated memory
@@ -392,7 +393,9 @@ int yash_entrypoint(char *inString) {
         }
 
         // Execute new image   
-        execvp(parsedcmd[0], parsedcmd);
+        if (execvp(parsedcmd[0], parsedcmd) < 0);
+            printf("parsedcmd %s", parsedcmd);
+            return -1;
         // Free allocated memory
         //free(parsedcmd);
         //kill(0, SIGCHLD);

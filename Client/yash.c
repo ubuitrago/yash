@@ -68,6 +68,17 @@ int is_empty_input(const char *input) {
     }
     return 1;  // Input is empty or whitespace only
 }
+
+int contains_gt(const char *input) {
+    // Check if the input string contains the character '>'
+    for (int i = 0; input[i] != '\0'; i++) {
+        if (input[i] == '>') {
+            return 1;  // Found '>', return true
+        }
+    }
+    return 0;  // '>' not found, return false
+}
+
 void handle_client(int sockfd) {
     char input[BUFSIZE];
     int rc;
@@ -89,6 +100,9 @@ void handle_client(int sockfd) {
             continue;      // Skip sending to the server
         }
         
+        // Check if output is redirected
+        //int output_redirect = contains_gt(input);
+
         // Handle "quit" to exit the client
         if (strcmp(input, "quit") == 0) {
             break;
@@ -99,18 +113,33 @@ void handle_client(int sockfd) {
         send(sockfd, buffer, strlen(buffer), 0);
 
         // Receive the response from the server
-        memset(buffer, 0, BUFSIZE); // Zero-out buffer
+        clean_buffer(buffer); // Zero-out buffer
       
         rc = recv(sockfd, buffer, BUFSIZE, 0);
         if (rc > 0) {
+            // Ensure the prompt is null-terminated
+            buffer[rc] = '\0';
+            // Search for the last occurrence of '#' in the buffer
+            //pound_prompt = strrchr(buffer, '#');
+        
+        
             // Display the server's response
             printf("%s", buffer);
-            // Get new prompt sent by server
+
+            // clen buffer and prepare for next command
             clean_buffer(buffer);
-            rc = recv(sockfd, buffer, BUFSIZE, 0);
-            if (rc >= 3)
-                printf("%s", buffer);
-                continue;
+            // rc = recv(sockfd, buffer, BUFSIZE, 0);
+            // // Ensure the prompt is null-terminated
+            // buffer[rc] = '\0';
+            // printf("%s", buffer);
+            continue;
+            // Continue if output is not expected
+            // if (output_redirect)
+            //     continue;
+            // else    // Else retrieve the prompt sent by server
+            //     rc = recv(sockfd, buffer, BUFSIZE, 0);
+            //     printf("%s", buffer);
+            //     continue;
         } else if (rc == 0) {
             printf("Server disconnected.\n");
             break;

@@ -126,19 +126,32 @@ void *serve_yash(void * input) {
 
     if ((hp = gethostbyaddr((char *)&from.sin_addr.s_addr,
 			    sizeof(from.sin_addr.s_addr),AF_INET)) == NULL)
-	fprintf(stderr, "Can't find host %s\n", inet_ntoa(from.sin_addr));
+	   fprintf(stderr, "Can't find host %s\n", inet_ntoa(from.sin_addr));
     else
-	printf("(Name is : %s)\n", hp->h_name);
-    
-    // Get data from  client
+	   printf("(Name is : %s)\n", hp->h_name);
+
+    /*
+    ==========================================================================
+        Read stream from  client, parse according to protocol, create a pipe
+        to capture stdout from execvp, parse output and send a response.
+    ==========================================================================
+    */
     int exec_return; // Return value from exec image within serving thread
+    int pipefd[2];
+    pid_t pid;
+    char exec_return_buffer[1024];   // Buffer to capture STDOUT from child
+
     for(;;){
     	//printf("\n...server is waiting...\n");
     	if((rc=recv(psd, buf, sizeof(buf), 0)) < 0){
     	    perror("receiving stream  message");
     	    exit(-1);
     	}
-
+        // Create a pipe
+        if (pipe(pipefd) == -1) {
+            perror("pipe");
+            exit(EXIT_FAILURE);
+        }
         // Parse received buffer
     	if (rc > 0){
     	    buf[rc]='\0';
@@ -146,6 +159,7 @@ void *serve_yash(void * input) {
     	    //printf("From TCP/Client: %s:%d\n", inet_ntoa(from.sin_addr),
     		   //ntohs(from.sin_port));
     	    //printf("(Name is : %s)\n", hp->h_name);
+
             // Handle CMD messages
             if (strncmp(buf, "CMD ", 4) == 0) {
                 strncpy(command, buf + 4, sizeof(command)-1);  // Extract the command after "CMD "
@@ -153,19 +167,54 @@ void *serve_yash(void * input) {
 
                 printf("Executing command: %s\n", command);
 
-                // Temporarily redirect stdout to the client socket
-                dup2(psd, STDOUT_FILENO);
-                dup2(psd, STDERR_FILENO);
+                // Redirect stdout to the write end of the pipe
+                dup2(pipefd[1], STDOUT_FILENO);
+                // if exec_return == KEY 
+                //     dup2(pipefd[0], psd)
+                //     // wait CTL D signal 
+                //     read from pipe pipe
+                //     send byffer yash_entyrpoint
+                // Close the write end of the pipe as it's now duplicated
+                close(pipefd[1]);
+
+                // dup2(psd, STDOUT_FILENO);
+                // dup2(psd, STDERR_FILENO);
+
                 // send command to yash (project 1) entrypoint
-                exec_return = yash_entrypoint(command);
+                exec_return = yash_entrypoint(command); // Return code 0 is a success
+                // Read from pipe
+                ssize_t exec_return_count = read(pipefd[0], exec_return_buffer, sizeof(exec_return_buffer) - 1);
+                if (exec_return_count == -1) {
+                    perror("read");
+                    exit(EXIT_FAILURE);
+                }
+                // Null-terminate to treat as string
+                exec_return_buffer[exec_return_count] = '\0';
+                // Close the read end of the pipe
+                close(pipefd[0]);
                 // Restore original stdin/stdout
                 dup2(saved_stdin, STDIN_FILENO);   
                 dup2(saved_stdout, STDOUT_FILENO);
-                if (exec_return == 0) {   
+                // Parse output and send a response
+                printf("Return value: %d\n", exec_return);
+                if (exec_return == 0) {
+                    //printf("%s", exec_return_buffer);
+                    // If output exists, send to client
+                    if (exec_return_count > 0){
+                        if (send(psd, exec_return_buffer, exec_return_count, 0) < 0 )
+                            perror("sending stream message");
+
+                    }// Else send a keyword for client side to handle
+                    else{
+                        if (send(psd, "NONE\0", 5, 0) < 0)
+                            perror("sending stream message");
+                    }
+
                     // After command execution, send the prompt to the client      
-                    if (send(psd, "\n# ", 3, 0) <0 )
-                      perror("sending stream message");
-                } else {
+                    if (send(psd, "\n# ", 4, 0) < 0 )
+                        perror("sending stream message");
+                } 
+                else {
                     printf("Return value: %d\n", exec_return);
                 }
             }
