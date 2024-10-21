@@ -309,10 +309,12 @@ int yash_entrypoint(char *inString, int pipefd[2], int psd){
         return 0;
     }else if (trigger_fg_cmd){  // Run fg command
         free(dup_inString);
+        dup2(pipefd[1], STDOUT_FILENO);
         fg_job();
         return 0;
     }else if (trigger_bg_cmd){  // Run bg command
         free(dup_inString);
+        dup2(pipefd[1], STDOUT_FILENO);
         bg_job();
         return 0;
     }
