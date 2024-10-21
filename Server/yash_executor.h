@@ -21,4 +21,4 @@ int handleInputRedirection(char **parsedcmd, int stdin_rdt);
 int executePipeline(char **parsedcmd, int pipe_char);
 
 // Entrypoint
-int yash_entrypoint(char *inString);
+int yash_entrypoint(char *inString, int pipefd[2], int psd);

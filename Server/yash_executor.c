@@ -19,6 +19,7 @@
 // Process variables
 bool pipeline = false;
 pid_t cpid = -1;
+pid_t global_pid = -1;
 pid_t left_cpid = -1;
 pid_t right_cpid = -1;
 char *dup_inString = NULL;
@@ -120,13 +121,13 @@ void sig_handler(int signo) {
             return;
         else
             //printf("PARENT %d\n", getppid());
-            //printf("KILL CHILD %d\n", cpid);
+            printf("KILL CHILD %d\n", cpid);
             kill(cpid, SIGINT);
     // Catches terminal stop         
     }else if (signo == SIGTSTP){
         if (pipeline){
             //printf("PARENT %d\n", getppid());
-            //printf("KILL CHILD %d\n", cpid);
+            printf("KILL CHILD %d\n", cpid);
             killpg(getppid(), SIGTSTP);
         }else if (fg == 0)
             return;
@@ -253,9 +254,9 @@ int executePipeline(char **parsedcmd, int pipe_char){
 / September 29, 2024. EE382V-Project1
 /*****************************************************************************************/
 // Program Launcher
-int yash_entrypoint(char *inString) {
+int yash_entrypoint(char *inString, int pipefd[2], int psd){
     pid_t parent = getpid();
-
+    cpid = -1;
     char **parsedcmd;
     int status;
 
@@ -303,6 +304,7 @@ int yash_entrypoint(char *inString) {
     if (trigger_job_cmd){
         free(dup_inString);
         print_jobs();
+        fflush(stdout);
         return 0;
     }else if (trigger_fg_cmd){  // Run fg command
         free(dup_inString);
@@ -327,6 +329,11 @@ int yash_entrypoint(char *inString) {
         parsedcmd[bg_char] = NULL;
     }
     /*---------------------------------------------------------------------------------------*/
+    // Disable buffering for stdout
+    //setvbuf(stdout, NULL, _IONBF, 0);
+    // Set pipe to non-blocking mode
+    int flags = fcntl(pipefd[0], F_GETFL, 0);  // Get the current file descriptor flags
+    fcntl(pipefd[0], F_SETFL, flags | O_NONBLOCK);  // Set the non-blocking flag
     // Fork child proc 
     cpid = fork();
 
@@ -367,15 +374,20 @@ int yash_entrypoint(char *inString) {
         // }
         ignore_handler();
         pipeline = false;
+        printf("FFLUSH");
         return 0;
     }
     
     else if (cpid == 0) { // Child process
-        // Child sets its process group
-        // if (setpgid(0, 0) < 0) {
-        //     perror("Failed to set process group in child");
-        //     exit(1);
-        // }
+        // Redirect child's STDOUT to the server's pipe (write end)
+        dup2(pipefd[1], STDOUT_FILENO);
+        //dup2(pipefd[0], STDIN_FILENO);
+        // Redirect child's STDIN to the client socket
+        dup2(psd, STDIN_FILENO);
+
+        // Close the pipe descriptors in the child
+        close(pipefd[1]);
+        close(pipefd[0]);
 
         // < 
         if (stdin_rdt >= 0){
@@ -400,11 +412,11 @@ int yash_entrypoint(char *inString) {
             exit(EXIT_FAILURE);
         }
         printf("Child ran %s", parsedcmd);
+        fflush(stdout);
         // Free allocated memory
         //free(parsedcmd);
         //kill(0, SIGCHLD);
         //return 0;
-        cpid = -1;
         exit(0);
     } else 
         perror("fork failed"); // Error if fork fails

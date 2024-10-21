@@ -27,6 +27,8 @@ DESCRIPTION:
 #include <unistd.h> /* close() */
 #include <stdlib.h> /* exit() */
 #include <pthread.h>
+#include <fcntl.h>  // For fcntl()
+#include <errno.h>  // For errno
 #include "serveTCPsocks.h"
 #include "yash_executor.c"
 
@@ -41,7 +43,6 @@ int serve_inet_socket() {
     int length;
     char ThisHost[MAXHOSTNAME];
     int pn;
-    int childpid;
     pthread_t th[MAXCONNECTIONS];
     
     /* get TCPServer1 Host information, NAME and INET ADDRESS */
@@ -139,20 +140,34 @@ void *serve_yash(void * input) {
     */
     int exec_return; // Return value from exec image within serving thread
     int pipefd[2];
-    pid_t pid;
+    int clientfd[2];
     char exec_return_buffer[1024];   // Buffer to capture STDOUT from child
 
+    // // Set pipe to non-blocking mode
+    // int flags = fcntl(pipefd[0], F_GETFL, 0);  // Get the current file descriptor flags
+    // fcntl(pipefd[0], F_SETFL, flags | O_NONBLOCK);  // Set the non-blocking flag
+
+    /*----------------------------------------------------------------------*/
     for(;;){
     	//printf("\n...server is waiting...\n");
+
     	if((rc=recv(psd, buf, sizeof(buf), 0)) < 0){
     	    perror("receiving stream  message");
     	    exit(-1);
     	}
-        // Create a pipe
+        /* Client ======== Server ======== child_proc()*/
+        // Create server-execvp pipe
         if (pipe(pipefd) == -1) {
             perror("pipe");
             exit(EXIT_FAILURE);
         }
+
+        // Create client-server pipe
+        if (pipe(clientfd) == -1) {
+            perror("pipe");
+            exit(EXIT_FAILURE);
+        }
+
         // Parse received buffer
     	if (rc > 0){
     	    buf[rc]='\0';
@@ -163,17 +178,15 @@ void *serve_yash(void * input) {
                 strncpy(command, buf + 4, sizeof(command)-1);  // Extract the command after "CTL "
                 command[sizeof(command) - 1] = '\0';  // Remove newline character
                 // Ignore incoming signal if global cpid hasn't been altered, i.e. no running process
-                if (cpid == -1){
-                    if (send(psd, "\n# ", 4, 0) < 0 )
-                        perror("sending stream message");
-                }
+                // if (FATHER == -1){
+                //     if (send(psd, "\n# ", 4, 0) < 0 )
+                //         perror("sending stream message");
+                // }
                 // Send signals to running processes
-                else{
-                    if (strcmp(command, "c") == 0) {
-                        kill(cpid, SIGINT);
-                    } else if (strcmp(command, "z") == 0){
-                        kill(cpid, SIGTSTP);
-                    }
+                if (strcmp(command, "c") == 0) {
+                    kill(FATHER, SIGINT);
+                } else if (strcmp(command, "z") == 0){
+                    kill(FATHER, SIGTSTP);
                 }
             }
             // Handle CMD messages
@@ -186,30 +199,24 @@ void *serve_yash(void * input) {
                 // Log the command
                 log_command(&from, command);  // Logging the command
 
-
-                // Redirect stdout to the write end of the pipe
-                dup2(pipefd[1], STDOUT_FILENO);
-                dup2(psd, STDIN_FILENO); // Recieve STDIN from client
-                // if exec_return == KEY 
-                //     dup2(pipefd[0], psd)
-                //     // wait CTL D signal 
-                //     read from pipe pipe
-                //     send byffer yash_entyrpoint
-                // Close the write end of the pipe as it's now duplicated
-                close(pipefd[1]);
-
-                // send command to yash (project 1) entrypoint
-                exec_return = yash_entrypoint(command); // Return code 0 is a success
+                // Call yash_entrypoint and pass pipe and socket descriptors
+                exec_return = yash_entrypoint(command, pipefd, psd);
                 // Read from pipe
                 ssize_t exec_return_count = read(pipefd[0], exec_return_buffer, sizeof(exec_return_buffer) - 1);
                 if (exec_return_count == -1) {
-                    perror("read");
-                    exit(EXIT_FAILURE);
+                    perror("read failed");
+                    //exit(EXIT_FAILURE);
                 }
+
+                // Handle EOF (no more data from the pipe)
+                if (exec_return_count == 0) {
+                    // No output from the command (EOF reached)
+                    printf("No output from command (pipe closed).\n");
+                }
+
                 // Null-terminate to treat as string
                 exec_return_buffer[exec_return_count] = '\0';
-                // Close the read end of the pipe
-                close(pipefd[0]);
+                //close(pipefd[0]);
                 // Restore original stdin/stdout
                 dup2(saved_stdin, STDIN_FILENO);   
                 dup2(saved_stdout, STDOUT_FILENO);
@@ -217,7 +224,7 @@ void *serve_yash(void * input) {
                 printf("Return value: %d\n", exec_return);
                 printf("Return COUNT: %d\n", exec_return_count);
 
-                if (exec_return == 0) {
+                if (exec_return == 0) { // Return code 0 is a success
                     //printf("%s", exec_return_buffer);
                     // If output exists, send to client
                     if (exec_return_count > 0){
@@ -231,8 +238,8 @@ void *serve_yash(void * input) {
                 // After command execution, send the prompt to the client      
                 if (send(psd, "\n# ", 4, 0) < 0 )
                     perror("sending stream message");
-            }
-    	}
+            }    
+        }
     	else {
     	    printf("TCP/Client: %s:%d\n", inet_ntoa(from.sin_addr),
     		   ntohs(from.sin_port));

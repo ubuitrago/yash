@@ -1,3 +1,29 @@
+// This is the Client implementation. 
+
+/*
+1- Connect to Server: 
+    The client connects to the server using the server's 
+    IP address and port 3820.
+2- Send Command: 
+    When the user types a command, the client sends the command 
+    to the server, prefixed by CMD.
+
+3- Receive Response: 
+    The client waits for the response from the server, 
+    displaying the result of the command and
+    the prompt # sent by the server.
+4- Signal Handling:
+    Ctrl-C: Send a control message CTL c\n to 
+         interrupt the current running command.
+    Ctrl-Z: Send a control message CTL z\n to 
+        suspend the current running command.
+    Ctrl-D (EOF): Terminate the client connection 
+        or allow the user to type quit to exit.
+5- Protocol: 
+    The client adheres to the specified protocol 
+    for sending and receiving messages from the server.
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,43 +34,31 @@
 #include <arpa/inet.h>
 #include <signal.h>
 #include <errno.h>
-#include <pthread.h>
 
 #define PORT 3820
 #define BUFSIZE 1024
 
 int sockfd;  // Global socket descriptor
 char buffer[BUFSIZE];
-int command_in_progress = 0;  // Global flag to indicate if a command is being executed
-pthread_mutex_t cmd_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // Signal handler for SIGINT (Ctrl-C)
 void handle_sigint(int sig) {
-    pthread_mutex_lock(&cmd_mutex);
-    if (command_in_progress) {
-        // Send control message to the server to stop the current command
-        char ctl_msg[] = "CTL c\n";
-        send(sockfd, ctl_msg, strlen(ctl_msg), 0);
-    }
-    // Ignore the signal if there's no command in progress (like Bash does)
-    pthread_mutex_unlock(&cmd_mutex);
+    // Send control message to the server to stop the current command
+    char ctl_msg[] = "CTL c\n";
+    send(sockfd, ctl_msg, strlen(ctl_msg), 0);
 }
 
 // Signal handler for SIGTSTP (Ctrl-Z)
 void handle_sigtstp(int sig) {
-    pthread_mutex_lock(&cmd_mutex);
-    if (command_in_progress) {
-        // Send control message to the server to suspend the current command
-        char ctl_msg[] = "CTL z\n";
-        send(sockfd, ctl_msg, strlen(ctl_msg), 0);
-    }
-    // Ignore the signal if there's no command in progress (like Bash does)
-    pthread_mutex_unlock(&cmd_mutex);
+    // Send control message to the server to suspend the current command
+    char ctl_msg[] = "CTL z\n";
+    send(sockfd, ctl_msg, strlen(ctl_msg), 0);
 }
 
-void clean_buffer(char *buffer) {
-    memset(buffer, 0, BUFSIZE);
+void clean_buffer(char *buffer){
+    memset(buffer, 0 , BUFSIZE);
 }
+
 
 int is_empty_input(const char *input) {
     // Check if the input string contains only spaces, tabs, or newlines
@@ -56,25 +70,26 @@ int is_empty_input(const char *input) {
     return 1;  // Input is empty or whitespace only
 }
 
-void *input_handler(void *arg) {
+void handle_client(int sockfd) {
     int rc;
     char input[BUFSIZE];
-
     printf("# ");  // Display prompt
     // Infinite loop to handle client commands
     while (1) {
-        // Free memory
+        // Free memory 
         memset(input, 0, BUFSIZE);
         // Assign fgets return value to variable ri and check
         char *ri = fgets(input, sizeof(input), stdin);
         if (ri == NULL) {
             if (errno == EINTR) {
-                continue;  // Handle signals that interrupt fgets
-            } else {
+                continue;
+            } else{
                 break;  // Exit if EOF (Ctrl-D)
             }
         }
-
+        // if (fgets(input, sizeof(input), stdin) == NULL) {
+        //     break;  // Exit if EOF (Ctrl-D)
+        // }
         // Remove trailing newline
         input[strcspn(input, "\n")] = 0;
 
@@ -89,41 +104,33 @@ void *input_handler(void *arg) {
             break;
         }
 
-        pthread_mutex_lock(&cmd_mutex);
-        command_in_progress = 1;  // Set flag to indicate command is running
-        pthread_mutex_unlock(&cmd_mutex);
-
         // Send the command to the server
         snprintf(buffer, sizeof(buffer), "CMD %s\n", input);
         send(sockfd, buffer, strlen(buffer), 0);
 
         // Receive the response from the server
-        clean_buffer(buffer);  // Zero-out buffer
+        clean_buffer(buffer); // Zero-out buffer
+      
         rc = recv(sockfd, buffer, BUFSIZE, 0);
         if (rc > 0) {
             // Ensure the prompt is null-terminated
             buffer[rc] = '\0';
+        
             // Display the server's response
             printf("%s", buffer);
+
+            // clen buffer and prepare for next command
+            clean_buffer(buffer);
+            continue;
         } else if (rc == 0) {
             printf("Server disconnected.\n");
             break;
         }
-
-        pthread_mutex_lock(&cmd_mutex);
-        command_in_progress = 0;  // Command finished executing
-        pthread_mutex_unlock(&cmd_mutex);
-
-        // Print prompt after each command execution
-        printf("# ");
     }
-
-    pthread_exit(NULL);
 }
 
 int main(int argc, char *argv[]) {
     struct sockaddr_in server_addr;
-    pthread_t input_thread;
 
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <IP_Address_of_Server>\n", argv[0]);
@@ -156,14 +163,8 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    // Create the input handling thread
-    if (pthread_create(&input_thread, NULL, input_handler, NULL) != 0) {
-        perror("Failed to create input thread");
-        exit(EXIT_FAILURE);
-    }
-
-    // Wait for the input thread to finish
-    pthread_join(input_thread, NULL);
+    // Handle the client operations
+    handle_client(sockfd);
 
     // Close the socket
     close(sockfd);

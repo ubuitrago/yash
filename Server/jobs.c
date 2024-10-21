@@ -67,6 +67,7 @@ void print_jobs() {
     if (job_count == 0){
         printf("garbage");
         fflush(stdout);
+        return;
     }
     for (int i = 0; i < job_count; i++) {
         if (jobs[i].status == DONE) {
