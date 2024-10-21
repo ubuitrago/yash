@@ -303,6 +303,7 @@ int yash_entrypoint(char *inString, int pipefd[2], int psd){
     // Run job commands
     if (trigger_job_cmd){
         free(dup_inString);
+        dup2(pipefd[1], STDOUT_FILENO);
         print_jobs();
         fflush(stdout);
         return 0;
@@ -330,7 +331,7 @@ int yash_entrypoint(char *inString, int pipefd[2], int psd){
     }
     /*---------------------------------------------------------------------------------------*/
     // Disable buffering for stdout
-    //setvbuf(stdout, NULL, _IONBF, 0);
+    setvbuf(stdout, NULL, _IONBF, 0);
     // Set pipe to non-blocking mode
     int flags = fcntl(pipefd[0], F_GETFL, 0);  // Get the current file descriptor flags
     fcntl(pipefd[0], F_SETFL, flags | O_NONBLOCK);  // Set the non-blocking flag
@@ -387,7 +388,7 @@ int yash_entrypoint(char *inString, int pipefd[2], int psd){
 
         // Close the pipe descriptors in the child
         close(pipefd[1]);
-        close(pipefd[0]);
+        //close(pipefd[0]);
 
         // < 
         if (stdin_rdt >= 0){
